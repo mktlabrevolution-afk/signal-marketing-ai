@@ -1,5 +1,4 @@
-export default async function handler(req, res) {
-  // CORS
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -14,20 +13,13 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
+    console.error('[Signal] ANTHROPIC_API_KEY is not set');
     return res.status(500).json({
-      error: 'ANTHROPIC_API_KEY no está configurada. Andá a Vercel → Settings → Environment Variables y agregala.'
+      error: 'ANTHROPIC_API_KEY no configurada. Ir a Vercel → Settings → Environment Variables y agregarla.'
     });
   }
 
-  let body;
-  try {
-    body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-  } catch {
-    return res.status(400).json({ error: 'Invalid JSON' });
-  }
-
-  // Force stream: true so the frontend streaming works
-  body = { ...body, stream: true };
+  const body = { ...req.body, stream: true };
 
   try {
     const upstream = await fetch('https://api.anthropic.com/v1/messages', {
@@ -42,10 +34,10 @@ export default async function handler(req, res) {
 
     if (!upstream.ok) {
       const errText = await upstream.text();
-      return res.status(upstream.status).json({ error: errText });
+      console.error('[Signal] Anthropic error:', upstream.status, errText);
+      return res.status(upstream.status).end(errText);
     }
 
-    // Stream the response back
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -61,9 +53,9 @@ export default async function handler(req, res) {
 
     res.end();
   } catch (err) {
-    console.error('Proxy error:', err);
+    console.error('[Signal] Proxy error:', err.message);
     if (!res.headersSent) {
       res.status(500).json({ error: err.message });
     }
   }
-}
+};
