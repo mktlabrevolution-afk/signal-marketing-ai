@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signal — MVP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0f0d;
+    --bg2: #151614;
+    --bg3: #1c1e1a;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e8e6e1;
+    --text2: #9a9890;
+    --text3: #5a5956;
+    --accent: #a8d840;
+    --accent-dim: rgba(168,216,64,0.12);
+    --accent-dim2: rgba(168,216,64,0.2);
+    --red: #e25c5c;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  html { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; line-height: 1.6; }
+  body { min-height: 100vh; }
+
+  /* ── Layout ─────────────────────────────────── */
+  .shell { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 240px; min-width: 240px; background: var(--bg2);
+    border-right: 1px solid var(--border); display: flex; flex-direction: column;
+    padding: 0; position: sticky; top: 0; height: 100vh;
+    overflow-y: auto;
+  }
+
+  .sidebar-top { padding: 28px 20px 20px; border-bottom: 1px solid var(--border); }
+
+  .logo {
+    font-family: 'DM Serif Display', serif; font-size: 22px;
+    color: var(--text); letter-spacing: -0.5px; margin-bottom: 4px;
+  }
+  .logo em { color: var(--accent); font-style: italic; }
+
+  .version-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--accent-dim); border: 1px solid var(--accent-dim2);
+    border-radius: 20px; padding: 2px 8px;
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent);
+  }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .nav { padding: 16px 12px; flex: 1; }
+  .nav-section-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; padding: 0 8px; margin: 16px 0 6px; }
+  .nav-section-label:first-child { margin-top: 0; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+    border-radius: var(--radius-sm); cursor: pointer; font-size: 13px;
+    color: var(--text2); transition: all 0.15s; border: 1px solid transparent;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: var(--accent-dim); border-color: var(--accent-dim2); color: var(--accent); }
+
+  .nav-icon { font-family: 'DM Mono', monospace; font-size: 11px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 5px; background: var(--bg3); color: var(--text3); flex-shrink: 0; }
+  .nav-item.active .nav-icon { background: var(--accent-dim2); color: var(--accent); }
+
+  .skill-badge-nav { margin-left: auto; font-family: 'DM Mono', monospace; font-size: 9px; background: var(--bg3); color: var(--text3); border-radius: 4px; padding: 1px 5px; }
+
+  .sidebar-footer { padding: 16px; border-top: 1px solid var(--border); }
+  .context-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text3); }
+  .context-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); flex-shrink: 0; transition: background 0.3s; }
+  .context-dot.ok { background: var(--accent); }
+
+  /* ── Main ────────────────────────────────────── */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar {
+    padding: 18px 32px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg); position: sticky; top: 0; z-index: 10;
+  }
+  .topbar-left h1 { font-family: 'DM Serif Display', serif; font-size: 18px; font-weight: 400; color: var(--text); }
+  .topbar-left p { font-size: 12px; color: var(--text3); margin-top: 1px; font-family: 'DM Mono', monospace; }
+
+  .api-status { display: flex; align-items: center; gap: 8px; }
+  .api-input-wrap { display: flex; align-items: center; gap: 0; }
+  /* API key UI removed — handled server-side */
+
+  /* ── Content ─────────────────────────────────── */
+  .content { flex: 1; padding: 32px; max-width: 860px; width: 100%; }
+
+  /* Step indicator */
+  .steps { display: flex; align-items: center; gap: 0; margin-bottom: 32px; }
+  .step-item { display: flex; align-items: center; gap: 8px; }
+  .step-num {
+    width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
+    background: var(--bg3); color: var(--text3); border: 1px solid var(--border);
+    transition: all 0.3s;
+  }
+  .step-num.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-dim2); }
+  .step-num.done { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .step-label { font-size: 12px; color: var(--text3); transition: color 0.3s; }
+  .step-label.active { color: var(--text); }
+  .step-sep { width: 32px; height: 1px; background: var(--border); margin: 0 8px; }
+
+  /* Cards */
+  .card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px; margin-bottom: 16px;
+    animation: fadeUp 0.3s ease both;
+  }
+  @keyframes fadeUp { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
+
+  .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+  .card-title { font-family: 'DM Serif Display', serif; font-size: 17px; font-weight: 400; color: var(--text); }
+  .card-sub { font-size: 12px; color: var(--text3); margin-top: 3px; font-family: 'DM Mono', monospace; }
+  .skill-tag { font-family: 'DM Mono', monospace; font-size: 10px; background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent-dim2); border-radius: 4px; padding: 3px 8px; white-space: nowrap; }
+
+  /* Form */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-grid.full { grid-template-columns: 1fr; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.span2 { grid-column: span 2; }
+
+  label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text3); letter-spacing: 0.05em; text-transform: uppercase; }
+
+  input[type="text"], textarea, select {
+    background: var(--bg3); border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px;
+    padding: 9px 12px; border-radius: var(--radius-sm); outline: none;
+    transition: border-color 0.2s, background 0.2s; resize: none;
+    width: 100%;
+  }
+  input[type="text"]:focus, textarea:focus, select:focus {
+    border-color: var(--accent); background: rgba(168,216,64,0.04);
+  }
+  input::placeholder, textarea::placeholder { color: var(--text3); }
+  select option { background: var(--bg3); }
+
+  /* Skill selector */
+  .skill-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 4px; }
+  .skill-option {
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px; cursor: pointer; transition: all 0.15s; background: var(--bg3);
+    position: relative;
+  }
+  .skill-option:hover { border-color: var(--border2); background: var(--bg2); }
+  .skill-option.selected { border-color: var(--accent); background: var(--accent-dim); }
+  .skill-option-name { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text); margin-bottom: 4px; }
+  .skill-option-desc { font-size: 11px; color: var(--text3); line-height: 1.4; }
+  .skill-option.selected .skill-option-name { color: var(--accent); }
+  .skill-check-mark { position: absolute; top: 8px; right: 8px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); display: none; align-items: center; justify-content: center; }
+  .skill-check-mark svg { width: 8px; height: 8px; }
+  .skill-option.selected .skill-check-mark { display: flex; }
+
+  /* Prompt preview */
+  .prompt-preview {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px 16px;
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text2);
+    line-height: 1.7; max-height: 180px; overflow-y: auto;
+    white-space: pre-wrap; margin-top: 12px;
+  }
+  .prompt-preview .highlight { color: var(--accent); }
+
+  /* Run button */
+  .run-section { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+  .btn-run {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--accent); color: var(--bg); border: none;
+    font-family: 'DM Sans', sans-serif; font-weight: 500; font-size: 13px;
+    padding: 10px 22px; border-radius: var(--radius-sm); cursor: pointer;
+    transition: all 0.2s; position: relative; overflow: hidden;
+  }
+  .btn-run:hover { background: #c1f050; transform: translateY(-1px); }
+  .btn-run:active { transform: translateY(0); }
+  .btn-run:disabled { background: var(--text3); cursor: not-allowed; transform: none; }
+  .btn-run .spinner { width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.3); border-top-color: var(--bg); border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
+  .btn-run.loading .spinner { display: block; }
+  .btn-run.loading .btn-label { opacity: 0.7; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .btn-secondary {
+    background: transparent; border: 1px solid var(--border2); color: var(--text2);
+    font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 10px 18px;
+    border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s;
+  }
+  .btn-secondary:hover { border-color: var(--border2); background: var(--bg3); color: var(--text); }
+
+  .run-hint { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+
+  /* Output */
+  .output-card { border-color: var(--accent-dim2); }
+  .output-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .output-label { display: flex; align-items: center; gap: 8px; }
+  .output-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s infinite; }
+  .output-title { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--accent); }
+  .copy-btn {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text3);
+    font-family: 'DM Mono', monospace; font-size: 10px; padding: 4px 10px;
+    border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  }
+  .copy-btn:hover { color: var(--text); border-color: var(--border2); }
+
+  .output-body {
+    font-size: 13px; color: var(--text); line-height: 1.75;
+    min-height: 80px; white-space: pre-wrap;
+    border-left: 2px solid var(--accent-dim2); padding-left: 16px;
+  }
+  .output-body.streaming { border-left-color: var(--accent); }
+  .cursor { display: inline-block; width: 2px; height: 14px; background: var(--accent); margin-left: 1px; animation: blink 1s step-end infinite; vertical-align: text-bottom; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .error-msg { color: var(--red); font-family: 'DM Mono', monospace; font-size: 12px; margin-top: 8px; }
+
+  /* Tokens */
+  .meta-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .meta-item { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text3); }
+  .meta-item span { color: var(--text2); }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .sidebar { display: none; }
+    .form-grid { grid-template-columns: 1fr; }
+    .form-group.span2 { grid-column: span 1; }
+    .skill-grid { grid-template-columns: 1fr; }
+    .content { padding: 20px; }
+    .topbar { padding: 14px 20px; }
+    .api-input { width: 140px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="logo">Sig<em>nal</em></div>
+      <div style="margin-top:8px">
+        <span class="version-badge"><span class="dot"></span> v0.7 · 34 skills</span>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section-label">Configuración</div>
+      <div class="nav-item active" onclick="scrollToSection('context-section')">
+        <span class="nav-icon">01</span>
+        Contexto del producto
+      </div>
+
+      <div class="nav-section-label">Skills activos</div>
+      <div class="nav-item" onclick="scrollToSection('skill-section')">
+        <span class="nav-icon">02</span>
+        Ejecutar skill
+        <span class="skill-badge-nav">34 activos</span>
+      </div>
+      <div class="nav-item" onclick="scrollToSection('output-section')">
+        <span class="nav-icon">03</span>
+        Output AI
+      </div>
+
+      <div class="nav-section-label" style="margin-top:16px">CRO</div>
+      <div class="nav-item" onclick="quickSelect('page-cro')"><span class="nav-icon">▣</span> page-cro</div>
+      <div class="nav-item" onclick="quickSelect('signup-flow-cro')"><span class="nav-icon">⇢</span> signup-flow-cro</div>
+      <div class="nav-item" onclick="quickSelect('onboarding-cro')"><span class="nav-icon">◉</span> onboarding-cro</div>
+      <div class="nav-item" onclick="quickSelect('paywall-cro')"><span class="nav-icon">$</span> paywall-cro</div>
+      <div class="nav-item" onclick="quickSelect('marketing-psychology')"><span class="nav-icon">ψ</span> mktg-psychology</div>
+
+      <div class="nav-section-label">Copy</div>
+      <div class="nav-item" onclick="quickSelect('copywriting')"><span class="nav-icon">✦</span> copywriting</div>
+      <div class="nav-item" onclick="quickSelect('email-sequence')"><span class="nav-icon">✉</span> email-sequence</div>
+      <div class="nav-item" onclick="quickSelect('content-writer')"><span class="nav-icon">✎</span> content-writer</div>
+
+      <div class="nav-section-label">SEO / GEO</div>
+      <div class="nav-item" onclick="quickSelect('ai-seo')"><span class="nav-icon">◎</span> ai-seo</div>
+      <div class="nav-item" onclick="quickSelect('geo-score')"><span class="nav-icon">◈</span> geo-score</div>
+      <div class="nav-item" onclick="quickSelect('competitor-alternatives')"><span class="nav-icon">⊕</span> competitor-alt</div>
+      <div class="nav-item" onclick="quickSelect('link-building')"><span class="nav-icon">⌁</span> link-building</div>
+
+      <div class="nav-section-label">Growth</div>
+      <div class="nav-item" onclick="quickSelect('programmatic-seo')"><span class="nav-icon">⊞</span> programmatic-seo</div>
+      <div class="nav-item" onclick="quickSelect('free-tool-strategy')"><span class="nav-icon">◇</span> free-tool-strategy</div>
+      <div class="nav-item" onclick="quickSelect('referral-program')"><span class="nav-icon">↻</span> referral-program</div>
+      <div class="nav-item" onclick="quickSelect('ad-creative')"><span class="nav-icon">▤</span> ad-creative</div>
+      <div class="nav-item" onclick="quickSelect('analytics-tracking')"><span class="nav-icon">≋</span> analytics-tracking</div>
+      <div class="nav-item" onclick="quickSelect('ab-test-setup')"><span class="nav-icon">⊘</span> ab-test-setup</div>
+
+      <div class="nav-section-label">Strategy</div>
+      <div class="nav-item" onclick="quickSelect('pricing-strategy')"><span class="nav-icon">¢</span> pricing-strategy</div>
+      <div class="nav-item" onclick="quickSelect('launch-strategy')"><span class="nav-icon">↑</span> launch-strategy</div>
+      <div class="nav-item" onclick="quickSelect('churn-prevention')"><span class="nav-icon">⊗</span> churn-prevention</div>
+      <div class="nav-item" onclick="quickSelect('cold-email')"><span class="nav-icon">✆</span> cold-email</div>
+      <div class="nav-item" onclick="quickSelect('marketing-ideas')"><span class="nav-icon">✺</span> marketing-ideas</div>
+
+      <div class="nav-section-label">Agency (ADK)</div>
+      <div class="nav-item" onclick="quickSelect('domain-ideas')"><span class="nav-icon">⊙</span> domain-ideas</div>
+      <div class="nav-item" onclick="quickSelect('website-builder')"><span class="nav-icon">◫</span> website-builder</div>
+      <div class="nav-item" onclick="quickSelect('gtm-strategy')"><span class="nav-icon">⊛</span> gtm-strategy</div>
+
+      <div class="nav-section-label">Community</div>
+      <div class="nav-item" onclick="quickSelect('reddit-strategy')"><span class="nav-icon">R</span> reddit-strategy</div>
+      <div class="nav-item" onclick="quickSelect('hacker-news')"><span class="nav-icon">Y</span> hacker-news</div>
+      <div class="nav-item" onclick="quickSelect('x-twitter')"><span class="nav-icon">X</span> x-twitter</div>
+
+      <div class="nav-section-label">Paid / Audits</div>
+      <div class="nav-item" onclick="quickSelect('paid-ads')"><span class="nav-icon">◆</span> paid-ads</div>
+      <div class="nav-item" onclick="quickSelect('seo-audit')"><span class="nav-icon">⊡</span> seo-audit</div>
+      <div class="nav-item" onclick="quickSelect('core-vitals')"><span class="nav-icon">⚡</span> core-vitals</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="context-status">
+        <div class="context-dot" id="ctx-dot"></div>
+        <span id="ctx-label">Contexto vacío</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <h1>Marketing AI Suite</h1>
+        <p>product-marketing-context · skill runner</p>
+      </div>
+      <div class="api-status">
+        <div style="display:flex; align-items:center; gap:8px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text3);">
+          <span id="api-status-dot" style="width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;"></span>
+          <span id="api-status-label">API conectada</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Steps -->
+      <div class="steps">
+        <div class="step-item">
+          <div class="step-num active" id="step1-num">1</div>
+          <div class="step-label active" id="step1-label">Contexto del producto</div>
+        </div>
+        <div class="step-sep"></div>
+        <div class="step-item">
+          <div class="step-num" id="step2-num">2</div>
+          <div class="step-label" id="step2-label">Elegir skill</div>
+        </div>
+        <div class="step-sep"></div>
+        <div class="step-item">
+          <div class="step-num" id="step3-num">3</div>
+          <div class="step-label" id="step3-label">Output AI</div>
+        </div>
+      </div>
+
+      <!-- STEP 1: Context Form -->
+      <div id="context-section">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Contexto del producto</div>
+              <div class="card-sub">product-marketing-context · todos los skills leen esto primero</div>
+            </div>
+            <span class="skill-tag">required</span>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nombre del producto</label>
+              <input type="text" id="f-name" placeholder="ej. Productify SaaS">
+            </div>
+            <div class="form-group">
+              <label>Ticket / precio</label>
+              <input type="text" id="f-price" placeholder="ej. $99/mes · freemium">
+            </div>
+            <div class="form-group span2">
+              <label>Propuesta de valor — 1 oración</label>
+              <input type="text" id="f-value" placeholder="ej. CRM que automatiza el seguimiento de leads para agencias digitales">
+            </div>
+            <div class="form-group">
+              <label>Cliente ideal (ICP)</label>
+              <input type="text" id="f-icp" placeholder="ej. Founders SaaS B2B, 1-10 empleados">
+            </div>
+            <div class="form-group">
+              <label>Etapa del negocio</label>
+              <select id="f-stage">
+                <option value="">Seleccionar...</option>
+                <option value="pre-lanzamiento (todavía no hay usuarios)">Pre-lanzamiento</option>
+                <option value="early stage (menos de 100 usuarios)">Early stage (&lt;100 usuarios)</option>
+                <option value="growth (100-1000 usuarios)">Growth (100-1000 usuarios)</option>
+                <option value="scale (más de 1000 usuarios)">Scale (+1000 usuarios)</option>
+              </select>
+            </div>
+            <div class="form-group span2">
+              <label>Competidores principales (separados por coma)</label>
+              <input type="text" id="f-comp" placeholder="ej. HubSpot, Pipedrive, Monday CRM">
+            </div>
+            <div class="form-group span2">
+              <label>Diferenciador clave vs competidores</label>
+              <input type="text" id="f-diff" placeholder="ej. Setup en 5 min, sin necesidad de entrenamiento, para equipos no técnicos">
+            </div>
+            <div class="form-group span2">
+              <label>Objeciones más comunes de los prospectos</label>
+              <input type="text" id="f-obj" placeholder="ej. 'Ya uso HubSpot', 'Es muy caro', 'No tenemos tiempo para implementarlo'">
+            </div>
+          </div>
+
+          <div style="margin-top:16px; display:flex; gap:10px; align-items:center">
+            <button class="btn-run" onclick="saveContext()" style="background: var(--bg3); color: var(--text); border: 1px solid var(--border2);">
+              <span class="btn-label">Guardar contexto</span>
+            </button>
+            <span class="run-hint" id="ctx-saved-msg" style="display:none; color: var(--accent);">✓ Contexto guardado</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: Skill Runner -->
+      <div id="skill-section">
+        <div class="card" id="skill-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Elegir skill</div>
+              <div class="card-sub">v0.7 · 34 skills · cro · copy · seo · geo · growth · strategy · agency · community · paid · audits</div>
+            </div>
+          </div>
+
+          <div class="skill-grid" style="grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));">
+
+            <!-- ── CRO ── -->
+            <div class="skill-option" onclick="selectSkill(this, 'page-cro')" data-category="cro">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(212,83,126,0.15); color:#ED93B1; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">cro</span></div>
+              <div class="skill-option-name">page-cro</div>
+              <div class="skill-option-desc">Optimiza conversiones en cualquier landing page</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'signup-flow-cro')" data-category="cro">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(212,83,126,0.15); color:#ED93B1; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">cro</span></div>
+              <div class="skill-option-name">signup-flow-cro</div>
+              <div class="skill-option-desc">Mejora el flujo de registro y activación</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'onboarding-cro')" data-category="cro">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(212,83,126,0.15); color:#ED93B1; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">cro</span></div>
+              <div class="skill-option-name">onboarding-cro</div>
+              <div class="skill-option-desc">Reduce time-to-value post-registro</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'paywall-cro')" data-category="cro">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(212,83,126,0.15); color:#ED93B1; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">cro</span></div>
+              <div class="skill-option-name">paywall-cro</div>
+              <div class="skill-option-desc">Optimiza pantallas de upgrade y monetización</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'marketing-psychology')" data-category="cro">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(212,83,126,0.15); color:#ED93B1; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">cro</span></div>
+              <div class="skill-option-name">mktg-psychology</div>
+              <div class="skill-option-desc">Sesgos cognitivos y triggers aplicados al producto</div>
+            </div>
+
+            <!-- ── Copy ── -->
+            <div class="skill-option selected" onclick="selectSkill(this, 'copywriting')" data-category="copy">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(168,216,64,0.15); color:var(--accent); border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">copy</span></div>
+              <div class="skill-option-name">copywriting</div>
+              <div class="skill-option-desc">Homepage, hero, CTAs y propuesta de valor</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'email-sequence')" data-category="copy">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(168,216,64,0.15); color:var(--accent); border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">copy</span></div>
+              <div class="skill-option-name">email-sequence</div>
+              <div class="skill-option-desc">5 emails de onboarding post-registro</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'content-writer')" data-category="copy">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(168,216,64,0.15); color:var(--accent); border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">copy</span></div>
+              <div class="skill-option-name">content-writer</div>
+              <div class="skill-option-desc">Blog posts, pillar pages y artículos SEO-ready</div>
+            </div>
+
+            <!-- ── SEO / GEO ── -->
+            <div class="skill-option" onclick="selectSkill(this, 'ai-seo')" data-category="seo">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(55,138,221,0.15); color:#85B7EB; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">seo</span></div>
+              <div class="skill-option-name">ai-seo</div>
+              <div class="skill-option-desc">Aparecer en ChatGPT, Perplexity y Gemini</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'geo-score')" data-category="geo">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(212,83,126,0.15); color:#ED93B1; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">geo</span></div>
+              <div class="skill-option-name">geo-score</div>
+              <div class="skill-option-desc">Score de visibilidad en AI: menciones, sentimiento</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'competitor-alternatives')" data-category="seo">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(55,138,221,0.15); color:#85B7EB; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">seo</span></div>
+              <div class="skill-option-name">competitor-alt</div>
+              <div class="skill-option-desc">Páginas "alternativa a X" para SEO + ventas</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'link-building')" data-category="seo">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(55,138,221,0.15); color:#85B7EB; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">seo</span></div>
+              <div class="skill-option-name">link-building</div>
+              <div class="skill-option-desc">Backlinks: guest posts, PR digital, HARO</div>
+            </div>
+
+            <!-- ── Community ── -->
+            <div class="skill-option" onclick="selectSkill(this, 'reddit-strategy')" data-category="community">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(226,92,48,0.15); color:#F09975; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">community</span></div>
+              <div class="skill-option-name">reddit-strategy</div>
+              <div class="skill-option-desc">Subreddits, posts y comentarios que generan tráfico</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'hacker-news')" data-category="community">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(226,92,48,0.15); color:#F09975; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">community</span></div>
+              <div class="skill-option-name">hacker-news</div>
+              <div class="skill-option-desc">Show HN, Ask HN y comentarios que convierten</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'x-twitter')" data-category="social">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(136,135,128,0.2); color:#B4B2A9; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">social</span></div>
+              <div class="skill-option-name">x-twitter</div>
+              <div class="skill-option-desc">Threads, hooks y estrategia de crecimiento en X</div>
+            </div>
+
+            <!-- ── Paid / Audits ── -->
+            <div class="skill-option" onclick="selectSkill(this, 'paid-ads')" data-category="paid">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(239,159,39,0.15); color:#EF9F27; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">paid</span></div>
+              <div class="skill-option-name">paid-ads</div>
+              <div class="skill-option-desc">Estructura de campañas Meta, Google y LinkedIn</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'seo-audit')" data-category="audit">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(93,202,165,0.15); color:#5DCAA5; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">audit</span></div>
+              <div class="skill-option-name">seo-audit</div>
+              <div class="skill-option-desc">Diagnóstico técnico + on-page + quick wins</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'core-vitals')" data-category="audit">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(93,202,165,0.15); color:#5DCAA5; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">audit</span></div>
+              <div class="skill-option-name">core-vitals</div>
+              <div class="skill-option-desc">LCP, INP, CLS — plan de mejora por score</div>
+            </div>
+
+            <!-- ── Growth ── -->
+            <div class="skill-option" onclick="selectSkill(this, 'programmatic-seo')" data-category="growth">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(99,153,34,0.15); color:#97C459; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">growth</span></div>
+              <div class="skill-option-name">programmatic-seo</div>
+              <div class="skill-option-desc">Páginas SEO a escala desde data del producto</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'free-tool-strategy')" data-category="growth">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(99,153,34,0.15); color:#97C459; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">growth</span></div>
+              <div class="skill-option-name">free-tool-strategy</div>
+              <div class="skill-option-desc">La app como canal: maximizar leads y SEO</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'referral-program')" data-category="growth">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(99,153,34,0.15); color:#97C459; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">growth</span></div>
+              <div class="skill-option-name">referral-program</div>
+              <div class="skill-option-desc">Loops virales y programa de referidos in-app</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'ad-creative')" data-category="growth">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(99,153,34,0.15); color:#97C459; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">growth</span></div>
+              <div class="skill-option-name">ad-creative</div>
+              <div class="skill-option-desc">Bulk generation de creativos para paid</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'analytics-tracking')" data-category="growth">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(99,153,34,0.15); color:#97C459; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">growth</span></div>
+              <div class="skill-option-name">analytics-tracking</div>
+              <div class="skill-option-desc">Eventos y funnels en GA4 / Mixpanel</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'ab-test-setup')" data-category="growth">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(99,153,34,0.15); color:#97C459; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">growth</span></div>
+              <div class="skill-option-name">ab-test-setup</div>
+              <div class="skill-option-desc">Diseño de experimentos estadísticamente rigurosos</div>
+            </div>
+
+            <!-- ── Strategy ── -->
+            <div class="skill-option" onclick="selectSkill(this, 'pricing-strategy')" data-category="strategy">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(127,119,221,0.15); color:#AFA9EC; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">strategy</span></div>
+              <div class="skill-option-name">pricing-strategy</div>
+              <div class="skill-option-desc">Planes, monetización y packaging óptimo</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'launch-strategy')" data-category="strategy">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(127,119,221,0.15); color:#AFA9EC; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">strategy</span></div>
+              <div class="skill-option-name">launch-strategy</div>
+              <div class="skill-option-desc">Lanzar apps o features con máximo impacto</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'churn-prevention')" data-category="strategy">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(127,119,221,0.15); color:#AFA9EC; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">strategy</span></div>
+              <div class="skill-option-name">churn-prevention</div>
+              <div class="skill-option-desc">Flujos de cancelación, dunning y win-back</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'cold-email')" data-category="strategy">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(127,119,221,0.15); color:#AFA9EC; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">strategy</span></div>
+              <div class="skill-option-name">cold-email</div>
+              <div class="skill-option-desc">Outreach B2B con secuencias que generan replies</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'marketing-ideas')" data-category="strategy">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(127,119,221,0.15); color:#AFA9EC; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">strategy</span></div>
+              <div class="skill-option-name">marketing-ideas</div>
+              <div class="skill-option-desc">140 ideas de marketing SaaS personalizadas</div>
+            </div>
+
+            <!-- ── Agency (Google ADK-inspired) ── -->
+            <div class="skill-option" onclick="selectSkill(this, 'domain-ideas')" data-category="agency">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(186,117,23,0.18); color:#EF9F27; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">agency</span></div>
+              <div class="skill-option-name">domain-ideas</div>
+              <div class="skill-option-desc">10 opciones de dominio disponibles para tu marca</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'website-builder')" data-category="agency">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(186,117,23,0.18); color:#EF9F27; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">agency</span></div>
+              <div class="skill-option-name">website-builder</div>
+              <div class="skill-option-desc">Sitio web completo HTML/CSS/JS listo para subir</div>
+            </div>
+
+            <div class="skill-option" onclick="selectSkill(this, 'gtm-strategy')" data-category="agency">
+              <div class="skill-check-mark"><svg viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0e0f0d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div style="margin-bottom:5px"><span style="font-size:9px; background:rgba(186,117,23,0.18); color:#EF9F27; border-radius:3px; padding:1px 5px; font-family:'DM Mono',monospace;">agency</span></div>
+              <div class="skill-option-name">gtm-strategy</div>
+              <div class="skill-option-desc">Plan GTM completo: canales, personas, SWOT, KPIs</div>
+            </div>
+
+          </div>
+
+          <!-- URL field — visible solo para audit skills -->
+          <div id="url-field-wrap" style="display:none; margin-top:14px;">
+            <div class="form-group">
+              <label>URL del sitio a auditar</label>
+              <input type="text" id="f-url" placeholder="https://tusitio.com" style="font-family:'DM Mono',monospace; font-size:12px;">
+            </div>
+          </div>
+
+          <div class="prompt-preview" id="prompt-preview">Seleccioná un skill y completá el contexto para ver el prompt que se enviará a Claude...</div>
+
+          <div class="run-section">
+            <button class="btn-run" id="run-btn" onclick="runSkill()">
+              <div class="spinner"></div>
+              <span class="btn-label">Ejecutar skill →</span>
+            </button>
+            <button class="btn-secondary" onclick="clearOutput()">Limpiar</button>
+            <span class="run-hint" id="run-hint">Completá el contexto del producto y elegí un skill</span>
+          </div>
+          <div class="error-msg" id="error-msg" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- STEP 3: Output -->
+      <div id="output-section">
+        <div class="card output-card" id="output-card" style="display:none">
+          <div class="output-header">
+            <div class="output-label">
+              <div class="output-dot" id="out-dot" style="animation:none; background: var(--text3)"></div>
+              <span class="output-title" id="out-title">Esperando ejecución...</span>
+            </div>
+            <button class="copy-btn" onclick="copyOutput()">Copiar</button>
+          </div>
+          <div class="output-body" id="output-body"></div>
+          <div class="meta-row" id="meta-row" style="display:none">
+            <div class="meta-item">skill: <span id="meta-skill">—</span></div>
+            <div class="meta-item">modelo: <span>claude-sonnet-4-20250514</span></div>
+            <div class="meta-item">tokens: <span id="meta-tokens">—</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────
+// API key is stored server-side in ANTHROPIC_API_KEY env var
+let selectedSkill = 'copywriting';
+let ctx = {};
+let outputText = '';
+let tokenCount = 0;
+
+// ── Init ───────────────────────────────────────────
+window.onload = () => {
+  updatePromptPreview();
+  loadSavedContext();
+};
+
+// API key management handled server-side
+
+// API key managed server-side
+
+// ── Context ────────────────────────────────────────
+function getContextFromForm() {
+  return {
+    name: document.getElementById('f-name').value.trim(),
+    value: document.getElementById('f-value').value.trim(),
+    icp: document.getElementById('f-icp').value.trim(),
+    price: document.getElementById('f-price').value.trim(),
+    stage: document.getElementById('f-stage').value.trim(),
+    competitors: document.getElementById('f-comp').value.trim(),
+    diff: document.getElementById('f-diff').value.trim(),
+    objections: document.getElementById('f-obj').value.trim(),
+  };
+}
+
+function saveContext() {
+  ctx = getContextFromForm();
+  localStorage.setItem('signal_ctx', JSON.stringify(ctx));
+  const hasContent = ctx.name || ctx.value;
+  document.getElementById('ctx-dot').className = 'context-dot ' + (hasContent ? 'ok' : '');
+  document.getElementById('ctx-label').textContent = hasContent ? `${ctx.name || 'Producto'} ✓` : 'Contexto vacío';
+  document.getElementById('step1-num').className = 'step-num done';
+  document.getElementById('ctx-saved-msg').style.display = 'inline';
+  setTimeout(() => { document.getElementById('ctx-saved-msg').style.display = 'none'; }, 2000);
+  updatePromptPreview();
+}
+
+function loadSavedContext() {
+  const saved = localStorage.getItem('signal_ctx');
+  if (saved) {
+    try {
+      ctx = JSON.parse(saved);
+      document.getElementById('f-name').value = ctx.name || '';
+      document.getElementById('f-value').value = ctx.value || '';
+      document.getElementById('f-icp').value = ctx.icp || '';
+      document.getElementById('f-price').value = ctx.price || '';
+      document.getElementById('f-stage').value = ctx.stage || '';
+      document.getElementById('f-comp').value = ctx.competitors || '';
+      document.getElementById('f-diff').value = ctx.diff || '';
+      document.getElementById('f-obj').value = ctx.objections || '';
+      if (ctx.name) {
+        document.getElementById('ctx-dot').className = 'context-dot ok';
+        document.getElementById('ctx-label').textContent = `${ctx.name} ✓`;
+        document.getElementById('step1-num').className = 'step-num done';
+      }
+      updatePromptPreview();
+    } catch(e) {}
+  }
+}
+
+// ── Skill selector ─────────────────────────────────
+const auditSkills = ['seo-audit', 'core-vitals', 'geo-score'];
+
+function selectSkill(el, skill) {
+  document.querySelectorAll('.skill-option').forEach(s => s.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedSkill = skill;
+  document.getElementById('step2-num').className = 'step-num done';
+  document.getElementById('url-field-wrap').style.display = auditSkills.includes(skill) ? 'block' : 'none';
+  updatePromptPreview();
+}
+
+function quickSelect(skill) {
+  const opt = document.querySelector(`.skill-option[onclick*="${skill}"]`);
+  if (opt) selectSkill(opt, skill);
+  scrollToSection('skill-section');
+}
+
+// ── Prompt builder ─────────────────────────────────
+function buildSystemPrompt() {
+  const c = ctx.name ? ctx : getContextFromForm();
+  return `Eres un experto en marketing de SaaS con 15 años de experiencia en growth hacking y conversion optimization. Tu trabajo es ayudar a marketers independientes y freelancers a generar outputs de marketing de altísima calidad.
+
+CONTEXTO DEL PRODUCTO:
+- Producto: ${c.name || '(sin nombre aún)'}
+- Propuesta de valor: ${c.value || '(no definida)'}
+- Cliente ideal (ICP): ${c.icp || '(no definido)'}
+- Precio: ${c.price || '(no definido)'}
+- Etapa: ${c.stage || '(no definida)'}
+- Competidores: ${c.competitors || '(no definidos)'}
+- Diferenciador clave: ${c.diff || '(no definido)'}
+- Objeciones comunes: ${c.objections || '(no definidas)'}
+
+Generás outputs listos para usar, específicos para este producto y su audiencia. Nunca usás genéricos. Siempre aplicás frameworks probados (AIDA, PAS, antes/después, etc). Respondés en español.`;
+}
+
+function buildUserPrompt(skill) {
+  const c = ctx.name ? ctx : getContextFromForm();
+  c.url = document.getElementById('f-url')?.value?.trim() || '';
+  const name = c.name || 'el producto';
+  const icp = c.icp || 'el cliente ideal';
+
+  const prompts = {
+
+    'page-cro': `Aplicá el skill de page-cro al sitio de ${name}${c.url ? ' (' + c.url + ')' : ''}.
+
+Analizá la página en 7 dimensiones (orden de impacto):
+
+1. Claridad de propuesta de valor — ¿Puede un visitante entender qué es esto y por qué importa en 5 segundos? ¿Está en el lenguaje de ${icp} o en jerga interna?
+2. Headline effectiveness — ¿Comunica el core value? ¿Es específico? ¿Matchea el tráfico?
+3. CTA: placement, copy, jerarquía — ¿Hay UNA acción primaria clara? ¿Visible sin scroll? ¿El texto comunica valor ("Start Free Trial") no solo acción ("Sign Up")?
+4. Jerarquía visual y scannability — ¿Se entiende el mensaje al escanear? ¿Whitespace suficiente?
+5. Trust signals y social proof — ¿Logos, testimonials con números reales, reviews? ¿Cerca de los CTAs?
+6. Manejo de objeciones — Para ${icp}: precio/valor, "¿funciona para mi caso?", dificultad de implementación
+7. Friction points — Demasiados campos, pasos confusos, problemas mobile, carga lenta
+
+Entregá:
+- Quick Wins (implementar hoy): cambios fáciles, impacto inmediato
+- Cambios de alto impacto: más esfuerzo, sube conversiones significativamente
+- Hipótesis A/B: testear, no asumir
+- Copy alternativo: 2-3 variantes de headline y CTA con rationale`,
+
+    'signup-flow-cro': `Aplicá el skill de signup-flow-cro al flujo de registro de ${name}.
+
+Principio: cada campo adicional reduce conversión. Email + Password es el mínimo viable.
+
+Field-by-field audit:
+- ¿Qué campos son necesarios ANTES de que puedan usar el producto?
+- ¿Cuáles pueden deferirse con progressive profiling?
+- Email: ¿validación inline? ¿typo detection?
+- Password: ¿toggle show/hide? ¿requisitos visibles upfront? ¿permite paste?
+- Nombre/Empresa/Rol: ¿puede ir al onboarding?
+
+Social auth: para ${icp}, ¿Google/Microsoft/GitHub? ¿Están prominentes?
+
+Single-step vs. Multi-step para ${name}: si multi-step → ¿progress indicator? ¿campos fáciles primero?
+
+Trust: "No credit card required" si aplica, nota de privacidad, error messages que no borren el form
+
+Post-submit: ¿la verificación de email puede deferirse? ¿Qué ve el usuario inmediatamente?
+
+Entregá: audit → quick wins → cambios de alto impacto → hipótesis A/B`,
+
+    'onboarding-cro': `Aplicá el skill de onboarding-cro a ${name} para maximizar activación de ${icp}.
+
+1. Aha Moment: ¿Qué hacen los usuarios que se quedan que no hacen los que churnan? ¿Cuál es el primer momento donde ${icp} siente el valor real de ${name}?
+
+2. Primer flujo (primeros 30 segundos): ¿Product-first, Guided setup, o Value-first? ¿Cuál para ${name}?
+
+3. Onboarding Checklist (3-7 items): verbo de acción + benefit hint + tiempo estimado + CTA directo. Empezar en 20% de progreso.
+
+4. Empty States: para cada sección vacía → ilustración + valor + CTA primario + opción secundaria
+
+5. Tooltips (máx 3-5): copy exacto para elementos no self-evident de ${name}
+
+6. Emails multi-canal: Welcome (inmediato), Incomplete (24h), Activation achieved, Stalled D7
+
+7. Métricas objetivo: activation rate, time-to-value, D1/D7/D30 retention para ${c.stage || 'esta etapa'}`,
+
+    'paywall-cro': `Aplicá el skill de paywall-upgrade-cro a ${name} (precio: ${c.price || 'a definir'}).
+
+1. Trigger points: Feature gates / Usage limits / Trial expiration / Time-based / Context-triggered
+¿Cuál es el más importante para ${name}? ¿El timing es correcto (post aha moment)?
+
+2. Copy completo del paywall principal:
+- Headline: "Unlock [Feature] para [Beneficio]" (no "Upgrade to Pro por $X/mes")
+- Value demonstration: preview de lo que se pierden
+- Feature comparison: diferencias clave free vs paid (más allá de checkmarks)
+- CTA específico + escape hatch visible (no dark patterns)
+
+3. Frecuencia: límite por sesión, cooldown post-dismiss (días), escalation para trial end
+
+4. Anti-patterns a evitar: dark patterns, guilt-trip copy, prompts antes de entender el producto
+
+5. A/B tests prioritarios: trigger timing, descuento vs trial adicional, hard gate vs soft preview, loss vs gain framing`,
+
+    'marketing-psychology': `Aplicá el skill de marketing-psychology a ${name} con el sistema de scoring PLFS.
+
+PLFS = (Leverage + Fit + Speed + Ethics) − Implementation Cost. Rango: -5 a +15. Solo recomendar modelos con PLFS ≥ 8.
+
+Seleccioná los TOP 5 modelos psicológicos más relevantes para ${name}. Para cada uno:
+
+- PLFS score con breakdown de las 5 dimensiones
+- Por qué funciona (psicología, breve)
+- Comportamiento target: ¿qué acción específica de ${icp} queremos cambiar?
+- Dónde aplicarlo en ${name}: landing page, pricing, onboarding, emails, paywall
+- Cómo implementarlo (3 pasos concretos)
+- Qué testear (hipótesis A/B específica)
+- Guardrail ético: qué NO hacer (sin dark patterns, sin false scarcity)
+
+Priorizá por etapa del journey:
+- Decision (pricing/paywall): Paradox of Choice, Loss Aversion, Default Effect, Anchoring
+- Retention: Endowment Effect, IKEA Effect, Status-Quo Bias
+- Awareness: Social Proof, Authority Bias
+
+Cada modelo debe mapear a una superficie real de ${name}, no ser teoría abstracta.`,
+
+    'copywriting': `Aplicá el skill de copywriting para escribir el copy completo de la homepage de ${name}.
+
+Principios en cada línea: Claridad > creatividad | Beneficios > features | Específico > vago | Lenguaje del cliente (${icp}) | Una idea por sección
+
+Entregá estas secciones:
+
+1. Above the fold: headline (fórmula: "{Achieve outcome} sin {pain}" / "The {category} para {audience}") + subheadline + CTA primario ("Start Free Trial" no "Sign Up") + CTA secundario + 2 alternativas de headline con rationale
+
+2. Social proof (qué tipo funciona mejor para ${name} — logos, stats, testimonials)
+
+3. Problema/Pain (mostrá que entendés la situación de ${icp})
+
+4. Solución/Beneficios (3-5 beneficios conectados a outcomes concretos, no features)
+
+5. Cómo funciona (3-4 pasos, reduce complejidad percibida)
+
+6. Objeciones: ${c.objections || 'las objeciones más comunes del ICP'} — respuestas específicas
+
+7. CTA final con risk reversal
+
+Evitar: exclamaciones, "streamline/optimize/innovative", voz pasiva, afirmaciones sin sustancia`,
+
+    'email-sequence': `Aplicá el skill de email-sequence para la secuencia de onboarding post-signup de ${name}.
+
+Principio: emails refuerzan el onboarding in-app, no lo duplican. Cada email tiene UN objetivo y UN CTA.
+
+7 emails completos:
+
+Email 1 — Welcome + First Step (INMEDIATO): Asunto A/B + Preview + Body (máx 100 palabras) + CTA a UNA acción crítica
+
+Email 2 — Quick Win (Día 1, si no completaron el Paso 1): tip rápido + soporte
+
+Email 3 — Feature Highlight (Día 2-3): feature clave para ${icp} + caso de uso + link in-app
+
+Email 4 — Success Story (Día 4-5): cliente que logró [outcome relatable para ${icp}] + soft CTA
+
+Email 5 — Check-In (Día 7): pedí feedback + ofrecé ayuda real
+
+Email 6 — Advanced Tip (Día 10-12): power feature para usuarios comprometidos
+
+Email 7 — Upgrade/Expand (Día 14+): para trial → conversión; para free → upgrade; resumí el valor entregado
+
+Para cada email: Asunto + Preview + Body + CTA + Timing + Exit conditions`,
+
+    'content-writer': `Aplicá el skill de content-writer para ${name} (plan 30 días).
+
+Parte 1 — Plan de contenido:
+
+Pillar page (1): tema principal de autoridad + título + outline de 8 secciones + keywords target
+
+Cluster articles (4): para cada uno → título, ángulo, keyword principal, intención de búsqueda
+
+Top-funnel articles (2): para ${icp} problem-aware, no product-aware (no mencionan ${name})
+
+Calendario editorial: qué publicar cada semana, canal (blog/LinkedIn/newsletter), cómo repurposear
+
+Parte 2 — Artículo completo (el de mayor impacto):
+Título SEO-optimizado + Meta description (150 chars) + Intro con hook para ${icp} + Secciones con H2/H3 + Datos con fuente + CTA interno natural + URL slug`,
+
+    'ai-seo': `Aplicá el skill de ai-seo para optimizar ${name} para búsqueda con IA.
+
+Los 3 pilares:
+
+PILAR 1 — ESTRUCTURA (hacer el contenido extraíble):
+AI extrae pasajes de 40-60 palabras (optimal). Auditá el contenido de ${name} contra:
+- Definition blocks (para "¿Qué es X?")
+- Step-by-step blocks (para "Cómo hacer X")
+- Comparison tables (superan al prose para comparaciones)
+- FAQ blocks con preguntas en lenguaje natural
+- Statistics blocks con fuentes citadas
+
+PILAR 2 — AUTORIDAD (ser citables):
+Según GEO research (Princeton KDD 2024):
+Citar fuentes: +40% | Estadísticas: +37% | Expert quotes: +30% | Tono autoritativo: +25%
+Keyword stuffing: -10% (daña activamente)
+¿Qué datos originales puede publicar ${name}?
+
+PILAR 3 — PRESENCIA (estar donde la IA busca):
+Wikipedia, Reddit, G2/Capterra/TrustRadius, YouTube how-to
+Robots.txt: ¿permitidos GPTBot, PerplexityBot, ClaudeBot, anthropic-ai, Google-Extended?
+
+10 queries prioritarias donde ${name} debería aparecer en ChatGPT/Perplexity/Gemini
+
+Plan de acción 30 días ordenado por impacto`,
+
+    'geo-score': `Aplicá el skill de geo-score para evaluar la visibilidad de ${name} en AI search.
+
+GEO Score por plataforma (ChatGPT, Perplexity, Google AI Overviews, Gemini, Claude):
+Para cada una: ¿aparecería ${name}? ¿Con qué sentimiento? ¿Qué fuentes lo citan?
+¿La URL está permitida en robots.txt para ese bot? ¿Schema.org implementado? ¿Presencia en Wikipedia/Reddit/G2?
+
+15 queries clave donde ${name} debería aparecer citado (por probabilidad de conversión para ${icp})
+
+Gap analysis vs ${c.competitors || 'competidores'}:
+¿Qué hacen ellos para aparecer en AI que ${name} no hace? (contenido estructurado, third-party presence, schema, backlinks)
+
+Plan de mejora 4 semanas:
+S1: robots.txt, schema básico | S2: reescribir páginas clave con extraction patterns | S3: Reddit, G2, Wikipedia | S4: original data/statistics
+
+KPIs mensuales para medir progreso`,
+
+    'competitor-alternatives': `Aplicá el skill de competitor-alternatives para ${name} vs ${c.competitors || 'sus competidores'}.
+
+4 formatos — diseñá los más relevantes:
+
+1. "[Competidor] Alternative" (singular): valida su frustración → ${name} como alternativa → comparación → migration path
+2. "[Competidor] Alternatives" (plural): incluí 4-7 alternativas reales (honestidad rankea mejor)
+3. "${name} vs [Competidor]": TL;DR 2-3 oraciones → comparison table (CÓMO maneja cada uno, no solo checkmarks) → who each is best for
+4. "[A] vs [B]": captura tráfico de queries de competidores
+
+Para el competidor principal (${c.competitors?.split(',')[0]?.trim() || 'el más importante'}), escribí la página completa:
+TL;DR | Comparison table por categorías | "Quién debería elegir ${name}" | "Quién debería elegir [Competidor]" (honesto) | Migration section | CTAs
+
+Principio: acknowledgé las fortalezas del competidor. Honesty builds trust.`,
+
+    'programmatic-seo': `Aplicá el skill de programmatic-seo para ${name}.
+
+FASE 0 OBLIGATORIA — Programmatic SEO Feasibility Index (0-100):
+
+1. Search Pattern Validity (0-20): ¿Patrón de keywords repetible y consistente?
+2. Unique Value per Page (0-25) — MÁS IMPORTANTE: ¿Info SIGNIFICATIVAMENTE diferente, o solo variables intercambiadas?
+3. Data Availability & Quality (0-20): ¿${name} tiene data propia? (propietaria > product-derived > UGC > licensed > public)
+4. Search Intent Alignment (0-15): ¿Las páginas satisfacen completamente la intención?
+5. Competitive Feasibility (0-10): ¿Ya rankean páginas programáticas en esas SERPs?
+6. Operational Sustainability (0-10): ¿Mantenible sin deuda de calidad?
+
+Veredicto: 80+ (Strong Fit) | 65-79 (Moderate) | 50-64 (High Risk) | <50 (Do Not Proceed → recomendá alternativas)
+
+Si score ≥65, diseñá:
+- 5 patrones de páginas para ${name}: URL structure, data source, estimated volume, unique value mechanism
+- Template spec del patrón más viable: secciones obligatorias + lógica condicional + index/noindex
+- Kill switch criteria: cuándo hacer rollback`,
+
+    'link-building': `Diseñá la estrategia de link building para ${name}${c.url ? ' (' + c.url + ')' : ''}.
+
+Top 5 tácticas por impacto/esfuerzo:
+
+1. Guest posting: 10 sitios target (DA, relevancia para ${icp}, audiencia) + temas a pitchear + email de outreach listo
+2. Digital PR: 3 ángulos de historia noticiable sobre ${name} + 5 publicaciones target + pitch template
+3. HARO/Connectively: posicionarse como experto para ${icp} + alertas + responder en <1 hora
+4. Skyscraper vs ${c.competitors?.split(',')[0]?.trim() || 'competidores'}: qué contenido de ellos tiene backlinks → crear algo mejor
+5. Directorios: top 10 relevantes para SaaS de [categoría de ${name}] — impacto real vs. vanity
+
+KPIs: links/mes realistas para ${c.stage || 'esta etapa'} + cómo trackear Domain Authority`,
+
+    'free-tool-strategy': `Aplicá el skill de free-tool-strategy para ${name}.
+
+Tool Idea Scorecard (rate 1-5): Search demand | Audience match | Unicidad | Camino al producto | Feasibility | Mantenimiento (inverso) | Link-building potential | Share-worthiness
+Score ≥25: fuerte | 15-24: prometedor | <15: reconsiderar
+
+¿Qué parte de ${name} puede ser un free tool? ¿Qué versión "lite" genera valor inmediato?
+
+3 ideas de micro-herramientas derivadas. Para cada una:
+- Tipo: Calculator / Generator / Analyzer / Tester / Library
+- Problema puntual de ${icp}
+- Keywords target
+- Scorecard score
+- Build: Custom / No-code (Outgrow, Involve.me) / Embed
+- Gating: Full / Partial / Ungated + optional capture
+- Hook de conversión hacia ${name}
+
+ROI Projection: Monthly leads × Lead-to-customer rate × ACV = Monthly value → Payback period
+
+Distribución: Product Hunt, Reddit r/[nicho], newsletters del sector`,
+
+    'referral-program': `Aplicá el skill de referral-program para ${name}.
+
+Máximo de incentivo: Max Reward = (LTV estimado × Gross Margin) − Target CAC
+Con precio ${c.price || 'a definir'}: ¿cuánto podés pagar por referido?
+
+Modelo para ${name}: Single-sided vs Double-sided | Tipo: crédito / meses gratis / cash / feature unlock
+
+El Referral Loop:
+Trigger (post aha moment, milestone, NPS alto) → Share (in-product link, email, código) → Conversión → Reward
+
+Copy completo:
+- Headline del programa
+- Email de invitación (asunto + body, máx 150 palabras, tono peer-to-peer)
+- Landing page del referido (headline + CTA)
+- Email de bienvenida al referido
+
+Viral mechanics in-product: "Made with ${name}", exports con branding, share de resultados
+
+K-factor projection: K = Invitations per user × Conversion rate
+¿Qué K es realista para ${name} en ${c.stage || 'esta etapa'}?
+
+Herramienta recomendada: ReferralCandy / GrowSurf / Friendbuy / Rewardful — con justificación`,
+
+    'ad-creative': `Aplicá el skill de ad-creative para generar creativos de ${name}.
+
+Primero: 5 ÁNGULOS distintos (razones por las que ${icp} haría click):
+Pain point | Outcome | Social proof | Curiosidad | Comparación vs ${c.competitors?.split(',')[0]?.trim() || 'competidores'}
+
+Google Ads RSA (specs exactas):
+- 15 headlines (máx 30 chars) — al menos 3 keyword, 3 benefit, 3 CTA — cada uno funciona SOLO
+- 4 descriptions (máx 90 chars)
+
+Meta Ads:
+- 5 primary texts (125 chars visible, hook primero)
+- 5 headlines (40 chars recomendado)
+- 2 scripts video 15s: hook(3s) + problema(5s) + solución(5s) + CTA(2s)
+
+LinkedIn (si ${icp} está en LinkedIn):
+- 3 intro texts (150 chars) + 3 headlines (70 chars)
+
+Por etapa del funnel: Top → pain point | Mid → diferenciador vs competidor | Bottom → urgencia + social proof
+
+Incluí character count. Si supera el límite, entregá versión trimmed.`,
+
+    'analytics-tracking': `Aplicá el skill de analytics-tracking para ${name}.
+
+FASE 0 OBLIGATORIA — Measurement Readiness Index (0-100):
+- Decision Alignment (0-25): ¿Cada evento mapea a una decisión?
+- Event Model Clarity (0-20): ¿Naming conventions? ¿Cambios de estado significativos?
+- Data Accuracy & Integrity (0-20): ¿Confiable? ¿Sin duplicados?
+- Conversion Definition Quality (0-15): ¿Las conversiones representan éxito real?
+- Attribution & Context (0-10): ¿UTMs consistentes?
+- Governance (0-10): ¿Documentado? ¿Ownership?
+
+Veredicto: 85+ (Ready) | 70-84 (Usable) | 55-69 (Unreliable) | <55 (Broken — no actúes sobre esta data)
+
+Taxonomía de eventos para ${name} (patrón: object_action, lowercase, underscores):
+Adquisición → Activación → Revenue → Retención → Referral
+
+Snippets de código GA4 (gtag.js) + Mixpanel JS SDK para los 10 eventos más críticos — listos para copiar/pegar
+
+4 funnels: Adquisición | Activación | Conversión Free→Paid | Retención D1/D7/D30
+
+Dashboard de 12 métricas para ${c.stage || 'esta etapa'} con fórmulas`,
+
+    'ab-test-setup': `Aplicá el skill de ab-test-setup para ${name}.
+
+HARD GATE 1 — HYPOTHESIS LOCK (obligatorio):
+Hipótesis válida: observación + cambio único + dirección esperada + audiencia definida + criterio medible
+Formato: "Al cambiar [X] por [Y] para [segmento Z], esperamos [métrica] mejorar en [%] porque [razón]"
+
+HARD GATE 2 — VALIDITY CHECK:
+Supuestos a verificar: estabilidad del tráfico | independencia de usuarios | confiabilidad de la métrica | randomización | sin factores externos
+Si algún supuesto es débil → advertí y recomendá retrasar.
+
+Backlog de 10 hipótesis para ${name} con PIE Score (Potential × Importance × Ease, 1-5 c/u)
+
+Sample size para los top 3: tráfico necesario + duración en días + MDE realista
+
+Test type: A/B (default) | A/B/n (más tráfico) | Split URL (cambios estructurales)
+
+EXECUTION READINESS GATE (Hard Stop): solo procedé si TODO esto es verdad:
+hipótesis locked | métrica frozen | sample calculado | duración definida | guardrails seteados | tracking verificado
+
+Los 7 errores que invalidan un test en ${name}: peeking early, multiple comparisons sin corrección, segmentación post-hoc, cambiar variantes mid-test, agregar tráfico nuevo, redefinir criterios, no definir stopping rules`,
+
+    'pricing-strategy': `Aplicá el skill de pricing-strategy para ${name}.
+
+Las 3 decisiones obligatorias de pricing:
+1. Packaging: ¿Qué incluye cada tier?
+2. Value Metric: ¿Por qué paga el cliente? (users/usage/outcomes/seats/records)
+3. Price Level: ¿Cuánto cuesta cada tier?
+
+Value Metric para ${name}: ¿A medida que los clientes obtienen más valor, pagan más naturalmente?
+Options: Per user/seat | Per usage | Per record | Flat fee | Revenue share
+¿Cuál alinea mejor con cómo ${icp} obtiene valor?
+
+Estructura 3 tiers (Good/Better/Best):
+Good: entry point, uso limitado, remueve fricción
+Better (anchor): donde debería estar ${icp}, mejor value-per-dollar
+Best: power users/enterprise
+Para cada tier: nombre, precio, tagline, features, límites de uso como upgrade triggers
+
+Pricing Psychology para ${name}: anchoring, annual vs monthly (descuento recomendado), decoy pricing si aplica
+
+Freemium vs Free Trial: ¿cuál aplica a ${name} y por qué?
+
+Señales de precio incorrecto y cómo detectarlas`,
+
+    'launch-strategy': `Aplicá el skill de launch-strategy para planificar el lanzamiento de ${name}.
+
+Framework ORB — todo debe fluir hacia canales OWNED:
+
+OWNED: ¿email list, blog, o comunidad? Para ${name} con ${icp}: ¿cuál construir?
+RENTED: ¿X, LinkedIn, Reddit? Elegí 1-2 donde ${icp} está activo. Usálos para traer tráfico a owned.
+BORROWED: 10 perfiles/newsletters/comunidades + template de pitch para cada uno
+
+5 fases para ${name}: Internal → Alpha → Beta → Early Access → Full Launch
+
+Plan completo del Full Launch:
+
+Pre-launch (4 semanas): waitlist + teaser content
+
+Día del lanzamiento:
+- Product Hunt: título + tagline + primer comentario listo (timing: martes/miércoles 12:01am PT)
+- Show HN: post completo sin hype, sin signos de exclamación
+- Reddit: posts para 3 subreddits específicos
+- X/Twitter: thread de 8-10 tweets
+- Email a lista: asunto + estructura completa
+
+Post-launch semana 1: onboarding sequence + páginas de comparación vs ${c.competitors?.split(',')[0]?.trim() || 'competidores'}
+
+Métricas de éxito para ${name} en ${c.stage || 'esta etapa'}`,
+
+    'churn-prevention': `Aplicá el skill de churn-prevention para ${name}.
+
+Voluntario (50-70% del churn) → Cancel Flow:
+
+Secuencia: Trigger → Exit Survey → Dynamic Save Offer → Confirmation → Post-Cancel
+
+Exit Survey (1 pregunta, máx 8 opciones): Muy caro | No uso suficiente | Falta feature | Cambio de tool | Problemas técnicos | Necesidad temporal | Otro
+
+Dynamic Save Offers (offer a reason):
+- Muy caro → Descuento 20-30% por 2-3 meses (NO >50%)
+- No usa → Pausa 1-3 meses (60-80% regresan)
+- Falta feature → Preview roadmap + workaround
+- Cambio de tool → Comparación + descuento
+- Temporal → Pausa
+
+Copy completo de cada pantalla: headline + copy + CTA + escape hatch visible (no dark patterns)
+
+Involuntario (30-50% del churn) → Dunning:
+
+Pre-dunning: email 30/15/7 días antes de que expire la tarjeta
+
+Secuencia dunning:
+Email 1 (Día 0): tono amigable, link directo a actualizar tarjeta
+Email 2 (Día 3): recordatorio
+Email 3 (Día 7): urgencia, cuenta se pausa en 3 días
+Email 4 (Día 10): último aviso
+
+Retries: soft declines → 3-5 intentos en 7-10 días | hard declines → no reintentar, pedir nueva tarjeta
+
+Win-back: D+7 (¿qué salió mal?) | D+30 (updates + oferta) | D+90 (oferta especial)
+
+7 señales de churn temprano para ${name} + health score model`,
+
+    'cold-email': `Aplicá el skill de cold-email para la outreach B2B de ${name}.
+
+Principios no negociables:
+- Escribí como un PEER. Si suena a marketing copy, reescribí.
+- Lead con el mundo de ellos. No empieces con quién sos.
+- Una ask, baja fricción: "¿Vale la pena explorar?" > "¿Tenés 30 minutos?"
+
+ICP refinado para ${name}: dentro de ${icp}, ¿quién es el decision maker vs. champion vs. blocker?
+
+Secuencia de 5 emails:
+
+Email 1 — Intro (máx 80 palabras):
+Observación/trigger específico → Problema que suele causar → ${name} resuelve esto → Ask
+EVITAR: "Espero que este email te encuentre bien", "Mi nombre es X", "synergy", "leverage"
+
+Email 2 — Ángulo diferente (Día 3, máx 60 palabras): caso de uso o resultado concreto
+
+Email 3 — Social proof (Día 7, máx 50 palabras): cliente similar a ${icp} con resultado específico
+
+Email 4 — Valor puro (Día 14): insight o recurso útil. Sin vender.
+
+Email 5 — Breakup (Día 21): cierra el loop dejando la puerta abierta.
+
+10 subject lines (2-4 palabras, lowercase, parecen internos, sin pitch de producto)
+
+Setup técnico: dominio secundario + warming + Instantly/Apollo/Lemlist + límites de envío seguros`,
+
+    'domain-ideas': `Generá 10 opciones de nombre de dominio para ${name}.
+
+Contexto: ${c.value || 'producto digital'} — ICP: ${icp} — Diferenciador: ${c.diff || 'a definir'}
+
+Para cada opción de dominio entregá:
+
+1. **Dominio** (.com prioritario, con alternativas .io / .co / .app si tiene sentido para ${name})
+2. **Rationale** (1 oración: por qué este nombre refleja el producto y es memorable para ${icp})
+3. **Disponibilidad estimada** — ¿es un nombre que probablemente esté tomado? ¿Qué variaciones podrían estar disponibles?
+4. **Score de memorabilidad** (1-10): fácil de pronunciar, deletrear, recordar y buscar en Google
+
+Criterios para generar los nombres:
+- Corto (idealmente 1-2 palabras, máx 15 chars antes del TLD)
+- Pronunciable y deletreable sin ambigüedad
+- Sin guiones, números, ni palabras difíciles
+- Que evoque el beneficio core o el ICP, no el feature técnico
+- Mix de estilos: literal, metafórico, inventado, combinado
+
+Tip para ${name}: basate en "${c.value || 'el valor central del producto'}" y en lo que ${icp} aspira a lograr, no en la tecnología detrás.
+
+Al final, recomendá el TOP 3 con justificación breve de por qué esos son los más sólidos.`,
+
+    'website-builder': `Generá el código completo de un sitio web profesional para ${name}.
+
+Contexto del producto:
+- Propuesta de valor: ${c.value || '(completar en contexto)'}
+- ICP: ${icp}
+- Precio: ${c.price || '(completar en contexto)'}
+- Diferenciador: ${c.diff || '(completar en contexto)'}
+- Competidores: ${c.competitors || '(completar en contexto)'}
+
+Generá los siguientes archivos completos listos para subir:
+
+**index.html** — Homepage con:
+- Hero section: headline orientado a beneficio + subheadline + CTA primario + CTA secundario
+- Social proof placeholder (logos de clientes, número de usuarios, o testimonial)
+- 3 propuestas de valor con iconos SVG inline
+- Sección "Cómo funciona" (3 pasos)
+- FAQ con las objeciones más comunes de ${icp}: ${c.objections || 'precio, facilidad de uso, soporte'}
+- CTA final con risk reversal ("No credit card required" / garantía de 30 días / etc.)
+- Footer con links + copyright
+
+**pricing.html** — Página de pricing con:
+- 3 planes (Free/Starter/Pro o equivalente para ${name})
+- Tabla comparativa de features
+- Toggle anual/mensual
+- Plan recomendado destacado
+- FAQ de precios
+
+**style.css** — Diseño moderno y profesional:
+- Variables CSS para colores y tipografía
+- Mobile-first responsive
+- Tipografía: Google Fonts (elegí una combinación que refuerce la identidad de ${name})
+- Paleta de colores apropiada para ${icp}
+- Animaciones sutiles en hover y scroll
+
+**script.js** — Interactividad:
+- Mobile nav toggle
+- Toggle anual/mensual en pricing
+- Smooth scroll
+- Active states en nav
+
+Todos los textos deben usar el copy real de ${name} basado en el contexto — no placeholders ni [INSERT TEXT HERE].`,
+
+    'gtm-strategy': `Actuás como un CMO experto. Diseñá el plan GTM (Go-to-Market) completo para ${name}.
+
+Contexto: ${c.value || 'SaaS'} — ICP: ${icp} — Etapa: ${c.stage || 'early stage'} — Precio: ${c.price || 'a definir'} — Competidores: ${c.competitors || 'a definir'}
+
+**1. PERSONAS (2 perfiles detallados de ${icp}):**
+Para cada persona:
+- Nombre, rol, empresa tipo, tamaño
+- Problema principal que ${name} resuelve
+- Motivaciones de compra
+- Objeciones más frecuentes: ${c.objections || 'precio, implementación, ROI'}
+- Canales donde pasan tiempo
+- Cómo miden el éxito
+
+**2. ANÁLISIS SWOT para ${name}:**
+- Fortalezas: ${c.diff ? 'basate en: ' + c.diff : 'identificar desde el contexto'}
+- Debilidades: sé honesto (no todo es fortaleza)
+- Oportunidades: tendencias del mercado que ${name} puede capturar
+- Amenazas: ${c.competitors || 'competidores'} y cambios del entorno
+
+**3. USP y MESSAGING:**
+- Propuesta de valor en 1 oración (para la homepage)
+- Tagline memorable (≤6 palabras)
+- Mensaje por audiencia: ${icp} decision maker vs. champion vs. end user
+- Diferenciador clave vs. ${c.competitors?.split(',')[0]?.trim() || 'el competidor principal'}
+
+**4. CANALES Y TÁCTICAS priorizados por fase:**
+Fase 1 (0-3 meses): adquisición rápida con bajo presupuesto
+Fase 2 (3-6 meses): escalar lo que funcionó
+Fase 3 (6-12 meses): channels compounding
+
+Para cada canal: táctica específica + estimación de CAC + time-to-signal
+
+**5. PRESUPUESTO estimado:**
+Distribución recomendada del budget de marketing para ${c.stage || 'early stage'}
+
+**6. KPIs y MÉTRICAS:**
+- North star metric para ${name}
+- Leading indicators (qué medir semanalmente)
+- Lagging indicators (qué medir mensualmente)
+- Targets realistas para ${c.stage || 'esta etapa'} en los primeros 6 meses`
+  };
+
+  return prompts[skill] || prompts['copywriting'];
+}
+
+function updatePromptPreview() {
+  const c = ctx.name ? ctx : getContextFromForm();
+  c.url = document.getElementById('f-url')?.value?.trim() || '';
+  const preview = document.getElementById('prompt-preview');
+  const skill = selectedSkill;
+
+  if (!c.name && !c.value) {
+    preview.innerHTML = '<span style="color:var(--text3)">Completá al menos el nombre del producto y la propuesta de valor para ver el prompt...</span>';
+    return;
+  }
+
+  const prompts = {
+    'page-cro': `skill: page-cro\nurl: ${c.url || '(ingresar URL)'} · icp: ${c.icp || '?'}\n\n→ Auditoría above-the-fold + friction map + 5 hipótesis A/B priorizadas + copy quick wins + CTA strategy.`,
+    'signup-flow-cro': `skill: signup-flow-cro\nproducto: ${c.name || '?'} · etapa: ${c.stage || '?'}\n\n→ Optimización de cada paso del registro: form, social login, email confirmación, progressive profiling y benchmarks.`,
+    'onboarding-cro': `skill: onboarding-cro\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ Definición del aha moment + mapa de activación + checklist gamificado + tooltips + empty states + métricas D7.`,
+    'paywall-cro': `skill: paywall-cro\nproducto: ${c.name || '?'} · precio: ${c.price || '?'}\n\n→ Feature gates + diseño pantalla de upgrade + copy + pricing psychology + timing de upgrade + win-back.`,
+    'marketing-psychology': `skill: mktg-psychology\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ Top 10 sesgos aplicables (Cialdini + cognitivos) + aplicaciones por área + 5 rewrites de copy con psicología de persuasión.`,
+    copywriting: `skill: copywriting\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ Homepage copy completo: headline, subheadline, propuestas de valor, CTAs, objeciones y social proof (framework antes/después/puente).`,
+    'email-sequence': `skill: email-sequence\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ 5 emails de onboarding: bienvenida (día 0), caso de uso (día 2), objeción (día 4), pro-tip (día 7), upgrade (día 14). Asuntos A/B.`,
+    'content-writer': `skill: content-writer\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ Plan de contenido 30 días (pillar page + 4 clusters + 2 top-funnel) + artículo completo listo para publicar.`,
+    'ai-seo': `skill: ai-seo\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ Estrategia para aparecer en ChatGPT, Perplexity, Gemini. 10 queries objetivo + plan de contenido + estructura para ser citado.`,
+    'geo-score': `skill: geo-score\nurl: ${c.url || '(ingresar URL)'} · competidores: ${c.competitors || '?'}\n\n→ GEO Score simulado en ChatGPT, Perplexity, Claude y Gemini. Gap analysis vs competidores + plan de mejora de visibilidad en AI.`,
+    'competitor-alternatives': `skill: competitor-alt\nproducto: ${c.name || '?'} · vs: ${c.competitors || '?'}\n\n→ Páginas "alternativa a X": estructura, página completa de ejemplo, keywords target, internal linking y tono brand-safe.`,
+    'reddit-strategy': `skill: reddit-strategy\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ 10 subreddits target + 5 posts listos + playbook de comentarios auténticos + sistema de monitoreo de oportunidades.`,
+    'hacker-news': `skill: hacker-news\nproducto: ${c.name || '?'}\n\n→ Show HN post completo + respuestas preparadas para las críticas más probables + estrategia de comentarios de valor.`,
+    'x-twitter': `skill: x-twitter\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ Posicionamiento en X + 10 tweets/threads listos + estrategia de engagement + 20 hooks + cadencia de publicación.`,
+    'paid-ads': `skill: paid-ads\nproducto: ${c.name || '?'} · precio: ${c.price || '?'}\n\n→ Estructura campañas Meta/Google/LinkedIn, audiencias, 5 headlines + primary texts, bid strategy y KPIs.`,
+    'seo-audit': `skill: seo-audit\nurl: ${c.url || '(ingresar URL)'} · competidores: ${c.competitors || '?'}\n\n→ Checklist técnico 15 puntos + on-page + 5 quick wins + gaps vs competidores + matriz impacto/esfuerzo.`,
+    'core-vitals': `skill: core-vitals\nurl: ${c.url || '(ingresar URL)'}\n\n→ Plan de mejora LCP < 2.5s · INP < 200ms · CLS < 0.1 con código de ejemplo, setup de monitoreo e impacto SEO.`,
+    'link-building': `skill: link-building\nproducto: ${c.name || '?'} · etapa: ${c.stage || '?'}\n\n→ Top 5 tácticas (guest post, digital PR, HARO, skyscraper, directorios) + templates de outreach + KPIs mensuales.`,
+    'programmatic-seo': `skill: programmatic-seo\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ 5 patrones de páginas escalables + template listo + dataset requerido + stack técnico + estimación de tráfico a 6 meses.`,
+    'free-tool-strategy': `skill: free-tool-strategy\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ Qué parte del producto liberar gratis + 3 micro-herramientas virales + distribución + flujo de captura de leads.`,
+    'referral-program': `skill: referral-program\nproducto: ${c.name || '?'} · precio: ${c.price || '?'}\n\n→ Mecánica bilateral/unilateral + triggers de invitación + copy completo + branding viral in-product + k-factor proyectado.`,
+    'ad-creative': `skill: ad-creative\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ Banco completo Meta + Google RSA + LinkedIn: headlines, primary texts, scripts de video 15s y variantes por etapa del funnel.`,
+    'analytics-tracking': `skill: analytics-tracking\nproducto: ${c.name || '?'} · etapa: ${c.stage || '?'}\n\n→ Taxonomía de eventos + snippets GA4 + Mixpanel copiables + 4 funnels clave + dashboard 12 métricas + alertas de anomalías.`,
+    'ab-test-setup': `skill: ab-test-setup\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ Backlog 10 hipótesis PIE score + calculadora de muestra + diseño completo test #1 + stack recomendado + 7 errores a evitar.`,
+    'pricing-strategy': `skill: pricing-strategy\nproducto: ${c.name || '?'} · precio: ${c.price || '?'}\n\n→ Modelo recomendado + 3 planes con triggers de upgrade + pricing psychology + copy de pricing page + experimentos de precio.`,
+    'launch-strategy': `skill: launch-strategy\nproducto: ${c.name || '?'} · etapa: ${c.stage || '?'}\n\n→ Plan 4 semanas pre-launch + canales (PH, HN, Reddit, X, newsletter) + plan día a día + outreach de lanzamiento + métricas de éxito.`,
+    'churn-prevention': `skill: churn-prevention\nproducto: ${c.name || '?'} · precio: ${c.price || '?'}\n\n→ 7 señales de churn + flujo de cancelación con save offers + dunning 3 emails + secuencia win-back + early warning system.`,
+    'cold-email': `skill: cold-email\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ ICP refinado para outreach + secuencia 5 emails listos + 10 subject lines + personalización a escala + setup técnico anti-spam.`,
+    'marketing-ideas': `skill: marketing-ideas\nproducto: ${c.name || '?'} · etapa: ${c.stage || '?'}\n\n→ MFS scoring. TOP 3-5 ideas con score ≥7. Formato: score + por qué fit + 3 pasos + timeline + riesgo.`,
+    'domain-ideas': `skill: domain-ideas (Google ADK)\nproducto: ${c.name || '?'} · icp: ${c.icp || '?'}\n\n→ 10 dominios con rationale, disponibilidad estimada y score de memorabilidad. TOP 3 recomendado.`,
+    'website-builder': `skill: website-builder (Google ADK)\nproducto: ${c.name || '?'} · precio: ${c.price || '?'}\n\n→ index.html + pricing.html + style.css + script.js. Copy real del producto, mobile-first, listo para subir.`,
+    'gtm-strategy': `skill: gtm-strategy (Google ADK)\nproducto: ${c.name || '?'} · etapa: ${c.stage || '?'}\n\n→ 2 personas detalladas, SWOT, USP + messaging, canales por fase, presupuesto estimado y KPIs con targets.`
+  };
+
+  preview.innerHTML = `<span class="highlight">// contexto cargado ✓</span>\n${prompts[skill] || ''}`;
+}
+
+// ── Run skill ──────────────────────────────────────
+async function runSkill() {
+  // API key is handled server-side via environment variable
+
+  const btn = document.getElementById('run-btn');
+  const outputCard = document.getElementById('output-card');
+  const outputBody = document.getElementById('output-body');
+  const outDot = document.getElementById('out-dot');
+  const outTitle = document.getElementById('out-title');
+  const errorEl = document.getElementById('error-msg');
+
+  btn.classList.add('loading');
+  btn.disabled = true;
+  errorEl.style.display = 'none';
+  outputText = '';
+  tokenCount = 0;
+
+  outputCard.style.display = 'block';
+  outputBody.className = 'output-body streaming';
+  outputBody.innerHTML = '<span class="cursor"></span>';
+  outDot.style.animation = 'pulse 1.5s infinite';
+  outDot.style.background = 'var(--accent)';
+  outTitle.textContent = `ejecutando ${selectedSkill}...`;
+  document.getElementById('meta-row').style.display = 'none';
+  document.getElementById('step3-num').className = 'step-num active';
+  document.getElementById('step3-label').className = 'step-label active';
+
+  outputCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        stream: true,
+        system: buildSystemPrompt(),
+        messages: [{ role: 'user', content: buildUserPrompt(selectedSkill) }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || `Error ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            outputText += parsed.delta.text;
+            outputBody.innerHTML = outputText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>') + '<span class="cursor"></span>';
+          }
+          if (parsed.type === 'message_delta' && parsed.usage) {
+            tokenCount = parsed.usage.output_tokens;
+          }
+        } catch(e) {}
+      }
+    }
+
+    outputBody.innerHTML = outputText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+    outputBody.className = 'output-body';
+    outDot.style.animation = 'none';
+    outDot.style.background = 'var(--accent)';
+    outTitle.textContent = `${selectedSkill} — output listo ✓`;
+    document.getElementById('meta-skill').textContent = selectedSkill;
+    document.getElementById('meta-tokens').textContent = tokenCount ? `~${tokenCount} output` : '—';
+    document.getElementById('meta-row').style.display = 'flex';
+    document.getElementById('step3-num').className = 'step-num done';
+
+  } catch(e) {
+    showError(e.message || 'Error al conectar con la API de Anthropic.');
+    outputCard.style.display = 'none';
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+function clearOutput() {
+  document.getElementById('output-card').style.display = 'none';
+  document.getElementById('error-msg').style.display = 'none';
+  outputText = '';
+}
+
+function copyOutput() {
+  if (outputText) {
+    navigator.clipboard.writeText(outputText).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = '¡Copiado!';
+      setTimeout(() => { btn.textContent = 'Copiar'; }, 1500);
+    });
+  }
+}
+
+function scrollToSection(id) {
+  document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+}
+
+// Live update prompt preview as user types
+['f-name','f-value','f-icp','f-price','f-comp','f-diff','f-obj','f-url'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updatePromptPreview);
+});
+document.getElementById('f-stage').addEventListener('change', updatePromptPreview);
+</script>
+</body>
+</html>
