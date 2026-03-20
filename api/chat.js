@@ -1,3 +1,10 @@
+// Signal — Gemini Proxy (March 2026)
+// Modelos disponibles en Google AI Studio:
+//   gemini-2.5-flash        → estable, free tier, recomendado
+//   gemini-3.1-flash-lite-preview → más nuevo, free tier, muy rápido
+
+const MODEL = 'gemini-2.5-flash';
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -13,31 +20,24 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  // Translate Anthropic payload → Gemini format
   const { max_tokens, system, messages } = req.body;
 
-  // Build Gemini contents array
-  const contents = [];
-  if (messages) {
-    for (const msg of messages) {
-      contents.push({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
-      });
-    }
-  }
+  // Translate Anthropic → Gemini format
+  const contents = (messages || []).map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }]
+  }));
 
   const geminiBody = {
     contents,
-    systemInstruction: system ? { parts: [{ text: system }] } : undefined,
+    ...(system && { systemInstruction: { parts: [{ text: system }] } }),
     generationConfig: {
       maxOutputTokens: max_tokens || 2000,
       temperature: 0.7,
     },
   };
 
-  const model = 'gemini-2.0-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
   try {
     const upstream = await fetch(url, {
@@ -48,7 +48,7 @@ module.exports = async function handler(req, res) {
 
     if (!upstream.ok) {
       const errText = await upstream.text();
-      console.error('[Signal] Gemini error:', upstream.status, errText);
+      console.error(`[Signal] Gemini error ${upstream.status}:`, errText);
       return res.status(upstream.status).end(errText);
     }
 
@@ -66,12 +66,12 @@ module.exports = async function handler(req, res) {
       buffer += decoder.decode(value, { stream: true });
 
       const lines = buffer.split('\n');
-      buffer = lines.pop();
+      buffer = lines.pop(); // keep incomplete line
 
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         const data = line.slice(6).trim();
-        if (!data || data === '[DONE]') continue;
+        if (!data) continue;
         try {
           const parsed = JSON.parse(data);
           const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -82,11 +82,6 @@ module.exports = async function handler(req, res) {
               delta: { type: 'text_delta', text }
             });
             res.write(`data: ${event}\n\n`);
-          }
-          // Detect finish
-          const finishReason = parsed.candidates?.[0]?.finishReason;
-          if (finishReason && finishReason !== 'STOP') {
-            console.warn('[Signal] Gemini finish reason:', finishReason);
           }
         } catch (_) {}
       }
