@@ -16,7 +16,7 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  const { max_tokens, system, messages } = req.body;
+  const { system, messages } = req.body;
 
   const contents = (messages || []).map(msg => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
@@ -27,7 +27,7 @@ module.exports = async function handler(req, res) {
     contents,
     ...(system && { systemInstruction: { parts: [{ text: system }] } }),
     generationConfig: {
-      maxOutputTokens: Math.min(max_tokens || 2000, 3000), // cap en 3000 para no exceder timeout
+      maxOutputTokens: 8192, // Gemini 2.5 Flash soporta hasta 8192 output tokens
       temperature: 0.7,
     },
   };
@@ -86,4 +86,4 @@ module.exports = async function handler(req, res) {
     console.error('[Signal] Proxy error:', err.message);
     if (!res.headersSent) res.status(500).json({ error: err.message });
   }
-};
+}; 
