@@ -1,8 +1,4 @@
-// Signal — Gemini Proxy (March 2026)
-// Modelos disponibles en Google AI Studio:
-//   gemini-2.5-flash        → estable, free tier, recomendado
-//   gemini-3.1-flash-lite-preview → más nuevo, free tier, muy rápido
-
+// Signal — Gemini Proxy
 const MODEL = 'gemini-2.5-flash';
 
 module.exports = async function handler(req, res) {
@@ -22,7 +18,6 @@ module.exports = async function handler(req, res) {
 
   const { max_tokens, system, messages } = req.body;
 
-  // Translate Anthropic → Gemini format
   const contents = (messages || []).map(msg => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: msg.content }]
@@ -32,7 +27,7 @@ module.exports = async function handler(req, res) {
     contents,
     ...(system && { systemInstruction: { parts: [{ text: system }] } }),
     generationConfig: {
-      maxOutputTokens: max_tokens || 2000,
+      maxOutputTokens: Math.min(max_tokens || 2000, 3000), // cap en 3000 para no exceder timeout
       temperature: 0.7,
     },
   };
@@ -66,7 +61,7 @@ module.exports = async function handler(req, res) {
       buffer += decoder.decode(value, { stream: true });
 
       const lines = buffer.split('\n');
-      buffer = lines.pop(); // keep incomplete line
+      buffer = lines.pop();
 
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
@@ -76,7 +71,6 @@ module.exports = async function handler(req, res) {
           const parsed = JSON.parse(data);
           const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
           if (text) {
-            // Emit in Anthropic streaming format so the frontend works unchanged
             const event = JSON.stringify({
               type: 'content_block_delta',
               delta: { type: 'text_delta', text }
@@ -92,4 +86,4 @@ module.exports = async function handler(req, res) {
     console.error('[Signal] Proxy error:', err.message);
     if (!res.headersSent) res.status(500).json({ error: err.message });
   }
-};  
+};
