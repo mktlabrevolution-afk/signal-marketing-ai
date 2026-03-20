@@ -92,4 +92,4 @@ module.exports = async function handler(req, res) {
     console.error('[Signal] Proxy error:', err.message);
     if (!res.headersSent) res.status(500).json({ error: err.message });
   }
-}; 
+};  
