@@ -1,4 +1,4 @@
-// Signal — Gemini Proxy
+// MktLab AI Suite — Gemini Proxy (non-streaming, JSON response)
 const MODEL = 'gemini-2.5-flash';
 
 module.exports = async function handler(req, res) {
@@ -27,12 +27,13 @@ module.exports = async function handler(req, res) {
     contents,
     ...(system && { systemInstruction: { parts: [{ text: system }] } }),
     generationConfig: {
-      maxOutputTokens: 8192, // Gemini 2.5 Flash soporta hasta 8192 output tokens
+      maxOutputTokens: 8192,
       temperature: 0.7,
     },
   };
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
+  // Use non-streaming endpoint
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
 
   try {
     const upstream = await fetch(url, {
@@ -41,49 +42,25 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify(geminiBody),
     });
 
+    const data = await upstream.json();
+
     if (!upstream.ok) {
-      const errText = await upstream.text();
-      console.error(`[Signal] Gemini error ${upstream.status}:`, errText);
-      return res.status(upstream.status).end(errText);
+      console.error('[MktLab] Gemini error:', upstream.status, JSON.stringify(data));
+      return res.status(upstream.status).json({ error: data.error?.message || 'Gemini error' });
     }
 
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
 
-    const reader = upstream.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+    // Return in Anthropic-compatible format (what the frontend expects)
+    return res.status(200).json({
+      content: [{ type: 'text', text }],
+      usage: { output_tokens: outputTokens },
+      model: MODEL,
+    });
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (!data) continue;
-        try {
-          const parsed = JSON.parse(data);
-          const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            const event = JSON.stringify({
-              type: 'content_block_delta',
-              delta: { type: 'text_delta', text }
-            });
-            res.write(`data: ${event}\n\n`);
-          }
-        } catch (_) {}
-      }
-    }
-
-    res.end();
   } catch (err) {
-    console.error('[Signal] Proxy error:', err.message);
-    if (!res.headersSent) res.status(500).json({ error: err.message });
+    console.error('[MktLab] Proxy error:', err.message);
+    return res.status(500).json({ error: err.message });
   }
-}; 
+};
